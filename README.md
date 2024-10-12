@@ -1,7 +1,7 @@
 # GovernOS
 GovernOS is my very first operating system development project. I know the code can (or will) be crap, but the aim is to learn and improve along the way.
 
-## Prerequisites
+## Prerequisites (Ubuntu)
 Make sure to install the following packages:
 ```bash
 sudo apt install nasm
