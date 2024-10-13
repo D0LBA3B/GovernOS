@@ -125,21 +125,24 @@ LBACHS:
 ;*************************************************;
 ; Bootloader Entry Point
 ;*************************************************;
-loader:
+main:
 
-    xor ax, ax         ; Clear AX register to 0.
-    mov ds, ax         ; Set the data segment (DS) to 0. We are at memory address 0x7C00.
-    mov es, ax         ; Set the extra segment (ES) to 0. Addresses are relative to 0x7C00.
+    ; Setup segment registers
+    cli                         ; Disable interrupts
+    mov     ax, 0x07C0          ; Load segment address (0x07C0:0000 = 0x7C00 in memory)
+    mov     ds, ax              ; Set the data segment
+    mov     es, ax              ; Set the extra segment
+    mov     fs, ax              ; Set fs segment
+    mov     gs, ax              ; Set gs segment
 
-    mov si, msg        ; Load the address of the message string into SI.
-    call Print         ; Call the print function to display the message.
+    mov     si, msg             ; Load the address of the message string into SI.
+    call    Print               ; Call the print function to display the message.
 
-    xor ax, ax         ; Clear AX register.
-    int 0x12           ; BIOS interrupt to get the amount of installed memory (in kilobytes).
+    xor     ax, ax              ; Clear AX register.
+    int     0x12                ; BIOS interrupt to get the amount of installed memory (in kilobytes).
 
-    cli                ; Disable interrupts (clear interrupt flag).
-    hlt                ; Halt the system (wait for hardware reset or power off).
+    hlt                         ; Halt the system (wait for hardware reset or power off).
 
-times 510 - ($-$$) db 0 ; Fill the remaining space up to 510 bytes with zeros, to pad the bootloader to 512 bytes.
+times 510 - ($-$$) db 0         ; Fill the remaining space up to 510 bytes with zeros, to pad the bootloader to 512 bytes.
 
-dw 0xAA55             ; Boot signature (0xAA55), required for BIOS to recognize the bootloader as valid.
+dw 0xAA55                       ; Boot signature (0xAA55), required for BIOS to recognize the bootloader as valid.
