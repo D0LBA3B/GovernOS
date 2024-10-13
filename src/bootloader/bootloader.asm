@@ -47,6 +47,81 @@ Print:
 PrintDone:
             ret                   ; Return from the print function when done.
 
+;************************************************;
+; Reads a series of sectors using BIOS interrput 0x13
+; CX => Number of sectors to read
+; AX => Starting sector
+; ES:BX => Buffer to read to
+;************************************************;
+
+ReadSectors:
+    .MAIN
+        mov     di, 0x0005                     ; Set error retry counter to 5
+    .SECTORLOOP
+        push    ax                             ; Save starting sector
+        push    bx                             ; Save buffer pointer
+        push    cx                             ; Save number of sectors to read
+        call    LBACHS                         ; Convert starting sector from LBA to CHS (Cylinder-Head-Sector)
+        mov     ah, 0x02                       ; BIOS interrupt function to read disk sectors
+        mov     al, 0x01                       ; We are reading one sector
+        mov     ch, BYTE [absoluteTrack]       ; Load the track number (CHS - Cylinder)
+        mov     cl, BYTE [absoluteSector]      ; Load the sector number (CHS - Sector)
+        mov     dh, BYTE [absoluteHead]        ; Load the head number (CHS - Head)
+        mov     dl, BYTE [bsDriveNumber]       ; Load the drive number (floppy or hard drive)
+        int     0x13                           ; Call BIOS interrupt to read sector
+        jnc     .SUCCESS                       ; Jump to SUCCESS if no error (carry flag is clear)
+        xor     ax, ax                         ; If an error occurred, reset disk
+        int     0x13                           ; BIOS reset disk interrupt
+        dec     di                             ; Decrement retry counter
+        pop     cx                             ; Restore number of sectors
+        pop     bx                             ; Restore buffer pointer
+        pop     ax                             ; Restore starting sector
+        jnz     .SECTORLOOP                    ; Retry if counter is not zero
+        int     0x18                           ; If retries are exhausted, invoke BIOS reboot
+    .SUCCESS
+        mov     si, msgProgress                ; Load progress message into SI
+        call    Print                          ; Print the progress message
+        pop     cx                             ; Restore number of sectors
+        pop     bx                             ; Restore buffer pointer
+        pop     ax                             ; Restore starting sector
+        add     bx, WORD [bpbBytesPerSector]   ; Move the buffer pointer for the next sector
+        inc     ax                             ; Increment starting sector
+        loop    .MAIN                          ; Repeat for remaining sectors
+        ret                                   ; Return from the function
+
+;************************************************;
+; Convert CHS to LBA (Logical Block Addressing)
+; LBA = (cluster - 2) * sectors per cluster
+;************************************************;
+
+ClusterLBA:
+        sub     ax, 0x0002                     ; Adjust the cluster number to a zero-based cluster number
+        xor     cx, cx                         ; Clear CX to use it in the multiplication
+        mov     cl, BYTE [bpbSectorsPerCluster]; Load sectors per cluster (from BPB)
+        mul     cx                             ; Multiply AX by sectors per cluster (AX = AX * CX)
+        add     ax, WORD [datasector]          ; Add the base data sector to AX
+        ret                                   ; Return from the function
+
+;************************************************;
+; Convert LBA to CHS (Cylinder-Head-Sector)
+; AX => LBA Address to convert
+;
+; absolute sector = (logical sector / sectors per track) + 1
+; absolute head   = (logical sector / sectors per track) MOD number of heads
+; absolute track  = logical sector / (sectors per track * number of heads)
+;************************************************;
+
+LBACHS:
+        xor     dx, dx                         ; Clear DX (prepare for division)
+        div     WORD [bpbSectorsPerTrack]      ; Divide AX by the number of sectors per track
+        inc     dl                             ; Increment DL for 1-based sector number (sectors start from 1, not 0)
+        mov     BYTE [absoluteSector], dl      ; Store sector number in absoluteSector variable
+        xor     dx, dx                         ; Clear DX for the next division
+        div     WORD [bpbHeadsPerCylinder]     ; Divide AX by the number of heads per cylinder
+        mov     BYTE [absoluteHead], dl        ; Store head number in absoluteHead variable
+        mov     BYTE [absoluteTrack], al       ; Store track (cylinder) number in absoluteTrack variable
+        ret                                   ; Return from the function
+
 ;*************************************************;
 ; Bootloader Entry Point
 ;*************************************************;
