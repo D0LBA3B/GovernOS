@@ -1,8 +1,8 @@
-bits 16                          ; We are still in 16-bit Real Mode, as BIOS starts the bootloader in this mode.
+bits 16                         ; We are still in 16-bit Real Mode, as BIOS starts the bootloader in this mode.
 
-org 0x7c00                       ; The BIOS loads the bootloader at memory address 0x7C00, so we set the origin to this address.
+org 0                           ; The BIOS loads the bootloader at memory address 0x7C00, so we set the origin to this address.
 
-start: jmp loader                ; Jump over the OEM block to the actual loader code.
+start: jmp main                 ; Jump over the OEM block to the actual loader code.
 
 ;*************************************************;
 ;  OEM Parameter block (BIOS Parameter Block - BPB)
