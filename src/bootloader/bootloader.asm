@@ -127,16 +127,24 @@ LBACHS:
 ;*************************************************;
 main:
 
-    ; Setup segment registers at 0000:07C00
     mov     si, msg             ; Load the address of the message string into SI.
     call    Print               ; Call the print function to display the message.
-
     cli                         ; Disable interrupts
+
+    ; Setup segment registers at 0000:07C00
     mov     ax, 0x07C0          ; Load segment address (0x07C0:0000 = 0x7C00 in memory)
     mov     ds, ax              ; Set the data segment
     mov     es, ax              ; Set the extra segment
     mov     fs, ax              ; Set fs segment
     mov     gs, ax              ; Set gs segment
+
+    ; create the stack
+    mov     ax, 0x0000          ; Load the segment value 0x0000 into AX. This sets the stack segment (SS) to start at address 0x0000.
+    mov     ss, ax              ; Set the stack segment register (SS) to the value in AX (0x0000). This means that the stack will operate within the memory segment starting at address 0x0000.
+
+    mov     sp, 0xFFFF          ; Set the stack pointer (SP) to 0xFFFF.
+                                ; This places the stack pointer at the highest address within the segment (0x0000:FFFF).
+                                ; The stack grows downwards in memory, so starting at 0xFFFF gives the stack space to grow as data is pushed onto it.
 
     sti                         ; Restore interrupts
     mov     si, msgLoading
