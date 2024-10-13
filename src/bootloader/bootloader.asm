@@ -127,7 +127,10 @@ LBACHS:
 ;*************************************************;
 main:
 
-    ; Setup segment registers
+    ; Setup segment registers at 0000:07C00
+    mov     si, msg             ; Load the address of the message string into SI.
+    call    Print               ; Call the print function to display the message.
+
     cli                         ; Disable interrupts
     mov     ax, 0x07C0          ; Load segment address (0x07C0:0000 = 0x7C00 in memory)
     mov     ds, ax              ; Set the data segment
@@ -135,14 +138,16 @@ main:
     mov     fs, ax              ; Set fs segment
     mov     gs, ax              ; Set gs segment
 
-    mov     si, msg             ; Load the address of the message string into SI.
-    call    Print               ; Call the print function to display the message.
+    sti                         ; Restore interrupts
+    mov     si, msgLoading
+    call    Print
 
     xor     ax, ax              ; Clear AX register.
     int     0x12                ; BIOS interrupt to get the amount of installed memory (in kilobytes).
 
     hlt                         ; Halt the system (wait for hardware reset or power off).
 
-times 510 - ($-$$) db 0         ; Fill the remaining space up to 510 bytes with zeros, to pad the bootloader to 512 bytes.
+    msgLoading  db 0x0D, 0x0A, "Loading Boot Image ", 0x00
 
+times 510 - ($-$$) db 0         ; Fill the remaining space up to 510 bytes with zeros, to pad the bootloader to 512 bytes.
 dw 0xAA55                       ; Boot signature (0xAA55), required for BIOS to recognize the bootloader as valid.
