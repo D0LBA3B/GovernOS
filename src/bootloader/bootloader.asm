@@ -158,146 +158,153 @@ main:
     xor     ax, ax                        ; Clear AX register.
     int     0x12                          ; BIOS interrupt to get the amount of installed memory (in kilobytes).
 
-LOAD_ROOT:
-    ; compute size of root directory and store in "cx"
-    xor     cx, cx
-    xor     dx, dx
-    mov     ax, 0x0020                    ; 32 byte directory entry
-    mul     WORD [bpbRootEntries]         ; total size of directory
-    div     WORD [bpbBytesPerSector]      ; sectors used by directory
-    xchg    ax, cx
+    LOAD_ROOT:
+        ; compute size of root directory and store in "cx"
+        xor     cx, cx
+        xor     dx, dx
+        mov     ax, 0x0020                    ; 32 byte directory entry
+        mul     WORD [bpbRootEntries]         ; total size of directory
+        div     WORD [bpbBytesPerSector]      ; sectors used by directory
+        xchg    ax, cx
 
-    ; compute location of root directory and store in "ax"
-    mov     al, BYTE [bpbNumberOfFATs]    ; number of FATs
-    mul     WORD [bpbSectorsPerFAT]       ; sectors used by FATs
-    add     ax, WORD [bpbReservedSectors] ; adjust for bootsector
-    mov     WORD [datasector], ax         ; base of root directory
-    add     WORD [datasector], cx
+        ; compute location of root directory and store in "ax"
+        mov     al, BYTE [bpbNumberOfFATs]    ; number of FATs
+        mul     WORD [bpbSectorsPerFAT]       ; sectors used by FATs
+        add     ax, WORD [bpbReservedSectors] ; adjust for bootsector
+        mov     WORD [datasector], ax         ; base of root directory
+        add     WORD [datasector], cx
 
-    ; read root directory into memory (7C00:0200)
-    mov     bx, 0x0200                    ; copy root dir above bootcode
-    call    ReadSectors
+        ; read root directory into memory (7C00:0200)
+        mov     bx, 0x0200                    ; copy root dir above bootcode
+        call    ReadSectors
 
-    ;----------------------------------------------------
-    ; Find stage 2
-    ;----------------------------------------------------
+        ;----------------------------------------------------
+        ; Find stage 2
+        ;----------------------------------------------------
 
-    ; browse root directory for binary image
-    mov     cx, WORD [bpbRootEntries]     ; load loop counter
-    mov     di, 0x0200                    ; locate first root entry
-.LOOP:
-    push    cx
-    mov     cx, 0x000B                    ; eleven character name
-    mov     si, ImageName                 ; image name to find
-    push    di
-    rep     cmpsb                         ; test for entry match
-    pop     di
-    je      LOAD_FAT
-    pop     cx
-    add     di, 0x0020                    ; queue next directory entry
-    loop    .LOOP
-    jmp     FAILURE
+        ; browse root directory for binary image
+        mov     cx, WORD [bpbRootEntries]     ; load loop counter
+        mov     di, 0x0200                    ; locate first root entry
+    .LOOP:
+        push    cx
+        mov     cx, 0x000B                    ; eleven character name
+        mov     si, ImageName                 ; image name to find
+        push    di
+        rep     cmpsb                         ; test for entry match
+        pop     di
+        je      LOAD_FAT
+        pop     cx
+        add     di, 0x0020                    ; queue next directory entry
+        loop    .LOOP
+        jmp     FAILURE
 
-    ;----------------------------------------------------
-    ; Load FAT
-    ;----------------------------------------------------
+        ;----------------------------------------------------
+        ; Load FAT
+        ;----------------------------------------------------
 
-LOAD_FAT:
+    LOAD_FAT:
 
-    ; save starting cluster of boot image
+        ; save starting cluster of boot image
 
-    mov     si, msgCRLF
-    call    Print
-    mov     dx, WORD [di + 0x001A]
-    mov     WORD [cluster], dx            ; file's first cluster
+        mov     si, msgCRLF
+        call    Print
+        mov     dx, WORD [di + 0x001A]
+        mov     WORD [cluster], dx            ; file's first cluster
 
-    ; compute size of FAT and store in "cx"
+        ; compute size of FAT and store in "cx"
 
-    xor     ax, ax
-    mov     al, BYTE [bpbNumberOfFATs]    ; number of FATs
-    mul     WORD [bpbSectorsPerFAT]       ; sectors used by FATs
-    mov     cx, ax
+        xor     ax, ax
+        mov     al, BYTE [bpbNumberOfFATs]    ; number of FATs
+        mul     WORD [bpbSectorsPerFAT]       ; sectors used by FATs
+        mov     cx, ax
 
-    ; compute location of FAT and store in "ax"
+        ; compute location of FAT and store in "ax"
 
-    mov     ax, WORD [bpbReservedSectors] ; adjust for bootsector
+        mov     ax, WORD [bpbReservedSectors] ; adjust for bootsector
 
-    ; read FAT into memory (7C00:0200)
+        ; read FAT into memory (7C00:0200)
 
-    mov     bx, 0x0200                    ; copy FAT above bootcode
-    call    ReadSectors
+        mov     bx, 0x0200                    ; copy FAT above bootcode
+        call    ReadSectors
 
-    ; read image file into memory (0050:0000)
+        ; read image file into memory (0050:0000)
 
-    mov     si, msgCRLF
-    call    Print
-    mov     ax, 0x0050
-    mov     es, ax                        ; destination for image
-    mov     bx, 0x0000                    ; destination for image
-    push    bx
+        mov     si, msgCRLF
+        call    Print
+        mov     ax, 0x0050
+        mov     es, ax                        ; destination for image
+        mov     bx, 0x0000                    ; destination for image
+        push    bx
 
-    ;----------------------------------------------------
-    ; Load Stage 2
-    ;----------------------------------------------------
+        ;----------------------------------------------------
+        ; Load Stage 2
+        ;----------------------------------------------------
 
-LOAD_IMAGE:
+    LOAD_IMAGE:
 
-    mov     ax, WORD [cluster]            ; cluster to read
-    pop     bx                            ; buffer to read into
-    call    ClusterLBA                    ; convert cluster to LBA
-    xor     cx, cx
-    mov     cl, BYTE [bpbSectorsPerCluster] ; sectors to read
-    call    ReadSectors
-    push    bx
+        mov     ax, WORD [cluster]            ; cluster to read
+        pop     bx                            ; buffer to read into
+        call    ClusterLBA                    ; convert cluster to LBA
+        xor     cx, cx
+        mov     cl, BYTE [bpbSectorsPerCluster] ; sectors to read
+        call    ReadSectors
+        push    bx
 
-    ; compute next cluster
+        ; compute next cluster
 
-    mov     ax, WORD [cluster]            ; identify current cluster
-    mov     cx, ax                        ; copy current cluster
-    mov     dx, ax                        ; copy current cluster
-    shr     dx, 0x0001                    ; divide by two
-    add     cx, dx                        ; sum for (3/2)
-    mov     bx, 0x0200                    ; location of FAT in memory
-    add     bx, cx                        ; index into FAT
-    mov     dx, WORD [bx]                 ; read two bytes from FAT
-    test    ax, 0x0001
-    jnz     .ODD_CLUSTER
+        mov     ax, WORD [cluster]            ; identify current cluster
+        mov     cx, ax                        ; copy current cluster
+        mov     dx, ax                        ; copy current cluster
+        shr     dx, 0x0001                    ; divide by two
+        add     cx, dx                        ; sum for (3/2)
+        mov     bx, 0x0200                    ; location of FAT in memory
+        add     bx, cx                        ; index into FAT
+        mov     dx, WORD [bx]                 ; read two bytes from FAT
+        test    ax, 0x0001
+        jnz     .ODD_CLUSTER
 
-.EVEN_CLUSTER:
+    .EVEN_CLUSTER:
 
-    and     dx, 0000111111111111b         ; take low twelve bits
-    jmp     .DONE
+        and     dx, 0000111111111111b         ; take low twelve bits
+        jmp     .DONE
 
-.ODD_CLUSTER:
+    .ODD_CLUSTER:
 
-    shr     dx, 0x0004                    ; take high twelve bits
+        shr     dx, 0x0004                    ; take high twelve bits
 
-.DONE:
+    .DONE:
 
-    mov     WORD [cluster], dx            ; store new cluster
-    cmp     dx, 0x0FF0                    ; test for end of file
-    jb      LOAD_IMAGE
+        mov     WORD [cluster], dx            ; store new cluster
+        cmp     dx, 0x0FF0                    ; test for end of file
+        jb      LOAD_IMAGE
 
-DONE:
+    DONE:
 
-    mov     si, msgCRLF
-    call    Print
-    push    WORD 0x0050
-    push    WORD 0x0000
-    retf
+        mov     si, msgCRLF
+        call    Print
+        push    WORD 0x0050
+        push    WORD 0x0000
+        retf
 
-FAILURE:
+    FAILURE:
 
-    mov     si, msgFailure
-    call    Print
-    mov     ah, 0x00
-    int     0x16                          ; await keypress
-    int     0x19                          ; warm boot computer
+        mov     si, msgFailure
+        call    Print
+        mov     ah, 0x00
+        int     0x16                          ; await keypress
+        int     0x19                          ; warm boot computer
 
-msgLoading  db 0x0D, 0x0A, "Loading Boot Image ", 0x00
-msgCRLF     db 0x0D, 0x0A, 0x00
-msgProgress db ".", 0x00
-msgFailure  db 0x0D, 0x0A, "GOVERROR : Press Any Key to Reboot", 0x0A, 0x00
+    absoluteSector db 0x00
+    absoluteHead   db 0x00
+    absoluteTrack  db 0x00
 
-times 510 - ($-$$) db 0                 ; Fill the remaining space up to 510 bytes with zeros, to pad the bootloader to 512 bytes.
-dw 0xAA55                               ; Boot signature (0xAA55), required for BIOS to recognize the bootloader as valid.
+    datasector  dw 0x0000
+    cluster     dw 0x0000
+    ImageName   db "KRNLDR  SYS"
+    msgLoading  db 0x0D, 0x0A, "Loading Boot Image ", 0x00
+    msgCRLF     db 0x0D, 0x0A, 0x00
+    msgProgress db ".", 0x00
+    msgFailure  db 0x0D, 0x0A, "GOVERROR : Press Any Key to Reboot", 0x0A, 0x00
+
+        times 510 - ($-$$) db 0                 ; Fill the remaining space up to 510 bytes with zeros, to pad the bootloader to 512 bytes.
+        dw 0xAA55                               ; Boot signature (0xAA55), required for BIOS to recognize the bootloader as valid.
