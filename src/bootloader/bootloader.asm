@@ -19,7 +19,7 @@ bpbReservedSectors:  DW 1        ; Number of reserved sectors (the first sector,
 bpbNumberOfFATs:     DB 2        ; Number of File Allocation Tables (FATs) present (2 for redundancy).
 bpbRootEntries:      DW 224      ; Maximum number of root directory entries (224 entries).
 bpbTotalSectors:     DW 2880     ; Total number of sectors on the disk (for a 1.44MB floppy, this is 2880).
-bpbMedia:           DB 0xF0      ; Media descriptor byte (0xF0 indicates a 1.44MB floppy disk).
+bpbMedia:           DB 0xf8  ;; 0xF1      ; Media descriptor byte (0xF0 indicates a 1.44MB floppy disk).
 bpbSectorsPerFAT:   DW 9         ; Number of sectors per FAT (9 sectors per FAT for a 1.44MB floppy).
 bpbSectorsPerTrack: DW 18        ; Number of sectors per track (18 sectors per track on a floppy disk).
 bpbHeadsPerCylinder: DW 2        ; Number of heads per cylinder (2 heads on a floppy disk).
