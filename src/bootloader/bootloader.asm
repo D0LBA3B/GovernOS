@@ -32,8 +32,6 @@ bsSerialNumber:     DD 0xa0a1a2a3 ; A random serial number for the disk (4 bytes
 bsVolumeLabel:      DB "MOS FLOPPY " ; The volume label for the disk (11 bytes, padded with spaces).
 bsFileSystem:       DB "FAT12   " ; The file system type, which is FAT12 (8 bytes, padded with spaces).
 
-msg db "Welcome to GovernOs!", 0  ; The string to display on boot, followed by a null terminator (0).
-
 ;***************************************
 ; Prints a string (null-terminated)
 ; DS=>SI: Points to the string
@@ -127,30 +125,29 @@ LBACHS:
 ; Bootloader Entry Point
 ;*************************************************;
 main:
-    cli                                   ; Disable interrupts
+        cli                                   ; Disable interrupts
+        ;----------------------------------------------------
+        ; Setup segment registers at 0000:07C00
+        ;----------------------------------------------------
+        mov     ax, 0x07C0                    ; Load segment address (0x07C0:0000 = 0x7C00 in memory)
+        mov     ds, ax                        ; Set the data segment
+        mov     es, ax                        ; Set the extra segment
+        mov     fs, ax                        ; Set fs segment
+        mov     gs, ax                        ; Set gs segment
 
-    ;----------------------------------------------------
-    ; Setup segment registers at 0000:07C00
-    ;----------------------------------------------------
-    mov     ax, 0x07C0                    ; Load segment address (0x07C0:0000 = 0x7C00 in memory)
-    mov     ds, ax                        ; Set the data segment
-    mov     es, ax                        ; Set the extra segment
-    mov     fs, ax                        ; Set fs segment
-    mov     gs, ax                        ; Set gs segment
+        ;----------------------------------------------------
+        ; Create stack
+        ;----------------------------------------------------
+        mov     ax, 0x0000                    ; Load the segment value 0x0000 into AX. This sets the stack segment (SS) to start at address 0x0000.
+        mov     ss, ax                        ; Set the stack segment register (SS) to the value in AX (0x0000). This means that the stack will operate within the memory segment starting at address 0x0000.
+        mov     sp, 0xFFFF                    ; Set the stack pointer (SP) to 0xFFFF.
+                                            ; This places the stack pointer at the highest address within the segment (0x0000:FFFF).
+                                            ; The stack grows downwards in memory, so starting at 0xFFFF gives the stack space to grow as data is pushed onto it.
+        sti                                   ; Restore interrupts
 
-    ;----------------------------------------------------
-    ; Create stack
-    ;----------------------------------------------------
-    mov     ax, 0x0000                    ; Load the segment value 0x0000 into AX. This sets the stack segment (SS) to start at address 0x0000.
-    mov     ss, ax                        ; Set the stack segment register (SS) to the value in AX (0x0000). This means that the stack will operate within the memory segment starting at address 0x0000.
-    mov     sp, 0xFFFF                    ; Set the stack pointer (SP) to 0xFFFF.
-                                          ; This places the stack pointer at the highest address within the segment (0x0000:FFFF).
-                                          ; The stack grows downwards in memory, so starting at 0xFFFF gives the stack space to grow as data is pushed onto it.
-    sti                                   ; Restore interrupts
-
-    ; Loading message
-    mov     si, msgLoading
-    call    Print
+        ; Loading message
+        mov     si, msgLoading
+        call    Print
 
     LOAD_ROOT:
         ; compute size of root directory and store in "cx"
@@ -184,7 +181,7 @@ main:
         mov     cx, 0x000B                    ; eleven character name
         mov     si, ImageName                 ; image name to find
         push    di
-        rep     cmpsb                         ; test for entry match
+    rep     cmpsb                         ; test for entry match
         pop     di
         je      LOAD_FAT
         pop     cx
@@ -199,30 +196,25 @@ main:
     LOAD_FAT:
 
         ; save starting cluster of boot image
-
         mov     si, msgCRLF
         call    Print
         mov     dx, WORD [di + 0x001A]
         mov     WORD [cluster], dx            ; file's first cluster
 
         ; compute size of FAT and store in "cx"
-
         xor     ax, ax
         mov     al, BYTE [bpbNumberOfFATs]    ; number of FATs
         mul     WORD [bpbSectorsPerFAT]       ; sectors used by FATs
         mov     cx, ax
 
         ; compute location of FAT and store in "ax"
-
         mov     ax, WORD [bpbReservedSectors] ; adjust for bootsector
 
         ; read FAT into memory (7C00:0200)
-
         mov     bx, 0x0200                    ; copy FAT above bootcode
         call    ReadSectors
 
         ; read image file into memory (0050:0000)
-
         mov     si, msgCRLF
         call    Print
         mov     ax, 0x0050
