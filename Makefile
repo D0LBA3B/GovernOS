@@ -24,7 +24,7 @@ $(BOOTLOADER): $(SRC_DIR)/bootloader.asm
 	mkdir -p $(BUILD_DIR)
 	$(NASM) -f bin $< -o $@
 
-$(STAGE2): $(SRC_DIR)/Stage2.asm
+$(STAGE2): $(SRC_DIR)/stage2.asm
 	mkdir -p $(BUILD_DIR)
 	$(NASM) -f bin $< -o $@
 
