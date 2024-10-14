@@ -87,7 +87,7 @@ ReadSectors:
         add     bx, WORD [bpbBytesPerSector]   ; Move the buffer pointer for the next sector
         inc     ax                             ; Increment starting sector
         loop    .MAIN                          ; Repeat for remaining sectors
-        ret                                   ; Return from the function
+        ret                                    ; Return from the function
 
 ;************************************************;
 ; Convert CHS to LBA (Logical Block Addressing)
@@ -100,7 +100,7 @@ ClusterLBA:
         mov     cl, BYTE [bpbSectorsPerCluster]; Load sectors per cluster (from BPB)
         mul     cx                             ; Multiply AX by sectors per cluster (AX = AX * CX)
         add     ax, WORD [datasector]          ; Add the base data sector to AX
-        ret                                   ; Return from the function
+        ret                                    ; Return from the function
 
 ;************************************************;
 ; Convert LBA to CHS (Cylinder-Head-Sector)
@@ -120,42 +120,68 @@ LBACHS:
         div     WORD [bpbHeadsPerCylinder]     ; Divide AX by the number of heads per cylinder
         mov     BYTE [absoluteHead], dl        ; Store head number in absoluteHead variable
         mov     BYTE [absoluteTrack], al       ; Store track (cylinder) number in absoluteTrack variable
-        ret                                   ; Return from the function
+        ret                                    ; Return from the function
 
 ;*************************************************;
 ; Bootloader Entry Point
 ;*************************************************;
 main:
-
     mov     si, msg             ; Load the address of the message string into SI.
     call    Print               ; Call the print function to display the message.
     cli                         ; Disable interrupts
 
+    ;----------------------------------------------------
     ; Setup segment registers at 0000:07C00
+    ;----------------------------------------------------
     mov     ax, 0x07C0          ; Load segment address (0x07C0:0000 = 0x7C00 in memory)
     mov     ds, ax              ; Set the data segment
     mov     es, ax              ; Set the extra segment
     mov     fs, ax              ; Set fs segment
     mov     gs, ax              ; Set gs segment
 
-    ; create the stack
+    ;----------------------------------------------------
+    ; Create stack
+    ;----------------------------------------------------
     mov     ax, 0x0000          ; Load the segment value 0x0000 into AX. This sets the stack segment (SS) to start at address 0x0000.
     mov     ss, ax              ; Set the stack segment register (SS) to the value in AX (0x0000). This means that the stack will operate within the memory segment starting at address 0x0000.
-
     mov     sp, 0xFFFF          ; Set the stack pointer (SP) to 0xFFFF.
                                 ; This places the stack pointer at the highest address within the segment (0x0000:FFFF).
                                 ; The stack grows downwards in memory, so starting at 0xFFFF gives the stack space to grow as data is pushed onto it.
 
     sti                         ; Restore interrupts
+
+    ; Loading message
     mov     si, msgLoading
     call    Print
 
     xor     ax, ax              ; Clear AX register.
     int     0x12                ; BIOS interrupt to get the amount of installed memory (in kilobytes).
 
-    hlt                         ; Halt the system (wait for hardware reset or power off).
+    LOAD_ROOT:
+        ; compute size of root directory and store in "cx"
+        xor     cx, cx
+        xor     dx, dx
+        mov     ax, 0x0020                           ; 32 byte directory entry
+        mul     WORD [bpbRootEntries]                ; total size of directory
+        div     WORD [bpbBytesPerSector]             ; sectors used by directory
+        xchg    ax, cx
+
+        ; compute location of root directory and store in "ax"
+        mov     al, BYTE [bpbNumberOfFATs]            ; number of FATs
+        mul     WORD [bpbSectorsPerFAT]               ; sectors used by FATs
+        add     ax, WORD [bpbReservedSectors]         ; adjust for bootsector
+        mov     WORD [datasector], ax                 ; base of root directory
+        add     WORD [datasector], cx
+        
+        ; read root directory into memory (7C00:0200)
+        mov     bx, 0x0200                            ; copy root dir above bootcode
+        call    ReadSectors
+
 
     msgLoading  db 0x0D, 0x0A, "Loading Boot Image ", 0x00
+    msgCRLF     db 0x0D, 0x0A, 0x00
+    msgProgress db ".", 0x00
+    msgFailure  db 0x0D, 0x0A, "GOVERROR : Press Any Key to Reboot", 0x0A, 0x00
 
 times 510 - ($-$$) db 0         ; Fill the remaining space up to 510 bytes with zeros, to pad the bootloader to 512 bytes.
 dw 0xAA55                       ; Boot signature (0xAA55), required for BIOS to recognize the bootloader as valid.
