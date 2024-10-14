@@ -20,7 +20,7 @@ QEMU_FLAGS = -machine q35 -fda $(DISK_IMAGE) -gdb tcp::26000 -S
 # Assemble the bootloader and Stage2
 all: $(DISK_IMAGE)
 
-$(BOOTLOADER): $(SRC_DIR)/Boot1.asm
+$(BOOTLOADER): $(SRC_DIR)/bootloader.asm
 	mkdir -p $(BUILD_DIR)
 	$(NASM) -f bin $< -o $@
 
