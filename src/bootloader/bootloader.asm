@@ -127,8 +127,6 @@ LBACHS:
 ; Bootloader Entry Point
 ;*************************************************;
 main:
-    mov     si, msg                        ; Load the address of the message string into SI.
-    call    Print                          ; Call the print function to display the message.
     cli                                   ; Disable interrupts
 
     ;----------------------------------------------------
@@ -148,15 +146,11 @@ main:
     mov     sp, 0xFFFF                    ; Set the stack pointer (SP) to 0xFFFF.
                                           ; This places the stack pointer at the highest address within the segment (0x0000:FFFF).
                                           ; The stack grows downwards in memory, so starting at 0xFFFF gives the stack space to grow as data is pushed onto it.
-
     sti                                   ; Restore interrupts
 
     ; Loading message
     mov     si, msgLoading
     call    Print
-
-    xor     ax, ax                        ; Clear AX register.
-    int     0x12                          ; BIOS interrupt to get the amount of installed memory (in kilobytes).
 
     LOAD_ROOT:
         ; compute size of root directory and store in "cx"
