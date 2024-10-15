@@ -93,12 +93,12 @@ ReadSectors:
 ;************************************************;
 
 ClusterLBA:
-    sub     ax, 0x0002                     ; Adjust the cluster number to a zero-based cluster number
-    xor     cx, cx                         ; Clear CX to use it in the multiplication
-    mov     cl, BYTE [bpbSectorsPerCluster]; Load sectors per cluster (from BPB)
-    mul     cx                             ; Multiply AX by sectors per cluster (AX = AX * CX)
-    add     ax, WORD [datasector]          ; Add the base data sector to AX
-    ret                                    ; Return from the function
+          sub     ax, 0x0002                     ; Adjust the cluster number to a zero-based cluster number
+          xor     cx, cx                         ; Clear CX to use it in the multiplication
+          mov     cl, BYTE [bpbSectorsPerCluster]; Load sectors per cluster (from BPB)
+          mul     cx                             ; Multiply AX by sectors per cluster (AX = AX * CX)
+          add     ax, WORD [datasector]          ; Add the base data sector to AX
+          ret                                    ; Return from the function
 
 ;************************************************;
 ; Convert LBA to CHS (Cylinder-Head-Sector)
@@ -110,174 +110,191 @@ ClusterLBA:
 ;************************************************;
 
 LBACHS:
-    xor     dx, dx                         ; Clear DX (prepare for division)
-    div     WORD [bpbSectorsPerTrack]      ; Divide AX by the number of sectors per track
-    inc     dl                             ; Increment DL for 1-based sector number (sectors start from 1, not 0)
-    mov     BYTE [absoluteSector], dl      ; Store sector number in absoluteSector variable
-    xor     dx, dx                         ; Clear DX for the next division
-    div     WORD [bpbHeadsPerCylinder]     ; Divide AX by the number of heads per cylinder
-    mov     BYTE [absoluteHead], dl        ; Store head number in absoluteHead variable
-    mov     BYTE [absoluteTrack], al       ; Store track (cylinder) number in absoluteTrack variable
-    ret                                    ; Return from the function
+          xor     dx, dx                         ; Clear DX (prepare for division)
+          div     WORD [bpbSectorsPerTrack]      ; Divide AX by the number of sectors per track
+          inc     dl                             ; Increment DL for 1-based sector number (sectors start from 1, not 0)
+          mov     BYTE [absoluteSector], dl      ; Store sector number in absoluteSector variable
+          xor     dx, dx                         ; Clear DX for the next division
+          div     WORD [bpbHeadsPerCylinder]     ; Divide AX by the number of heads per cylinder
+          mov     BYTE [absoluteHead], dl        ; Store head number in absoluteHead variable
+          mov     BYTE [absoluteTrack], al       ; Store track (cylinder) number in absoluteTrack variable
+          ret                                    ; Return from the function
 
 ;*************************************************;
 ; Bootloader Entry Point
 ;*************************************************;
 main:
-        cli                                   ; Disable interrupts
-        ;----------------------------------------------------
-        ; Setup segment registers at 0000:07C00
-        ;----------------------------------------------------
-        mov     ax, 0x07C0                    ; Load segment address (0x07C0:0000 = 0x7C00 in memory)
-        mov     ds, ax                        ; Set the data segment
-        mov     es, ax                        ; Set the extra segment
-        mov     fs, ax                        ; Set fs segment
-        mov     gs, ax                        ; Set gs segment
 
-        ;----------------------------------------------------
-        ; Create stack
-        ;----------------------------------------------------
-        mov     ax, 0x0000                    ; Load the segment value 0x0000 into AX. This sets the stack segment (SS) to start at address 0x0000.
-        mov     ss, ax                        ; Set the stack segment register (SS) to the value in AX (0x0000). This means that the stack will operate within the memory segment starting at address 0x0000.
-        mov     sp, 0xFFFF                    ; Set the stack pointer (SP) to 0xFFFF.
-                                            ; This places the stack pointer at the highest address within the segment (0x0000:FFFF).
-                                            ; The stack grows downwards in memory, so starting at 0xFFFF gives the stack space to grow as data is pushed onto it.
-        sti                                   ; Restore interrupts
+     ;----------------------------------------------------
+     ; code located at 0000:7C00, adjust segment registers
+     ;----------------------------------------------------
+     
+          cli						; disable interrupts
+          mov     ax, 0x07C0				; setup registers to point to our segment
+          mov     ds, ax
+          mov     es, ax
+          mov     fs, ax
+          mov     gs, ax
 
-        ; Loading message
-        mov     si, msgLoading
-        call    Print
+     ;----------------------------------------------------
+     ; create stack
+     ;----------------------------------------------------
+     
+          mov     ax, 0x0000				; set the stack
+          mov     ss, ax
+          mov     sp, 0xFFFF
+          sti						; restore interrupts
 
-    LOAD_ROOT:
-        ; compute size of root directory and store in "cx"
-        xor     cx, cx
-        xor     dx, dx
-        mov     ax, 0x0020                    ; 32 byte directory entry
-        mul     WORD [bpbRootEntries]         ; total size of directory
-        div     WORD [bpbBytesPerSector]      ; sectors used by directory
-        xchg    ax, cx
+     ;----------------------------------------------------
+     ; Display loading message
+     ;----------------------------------------------------
+     
+          mov     si, msgLoading
+          call    Print
+          
+     ;----------------------------------------------------
+     ; Load root directory table
+     ;----------------------------------------------------
 
-        ; compute location of root directory and store in "ax"
-        mov     al, BYTE [bpbNumberOfFATs]    ; number of FATs
-        mul     WORD [bpbSectorsPerFAT]       ; sectors used by FATs
-        add     ax, WORD [bpbReservedSectors] ; adjust for bootsector
-        mov     WORD [datasector], ax         ; base of root directory
-        add     WORD [datasector], cx
+     LOAD_ROOT:
+     
+     ; compute size of root directory and store in "cx"
+     
+          xor     cx, cx
+          xor     dx, dx
+          mov     ax, 0x0020                           ; 32 byte directory entry
+          mul     WORD [bpbRootEntries]                ; total size of directory
+          div     WORD [bpbBytesPerSector]             ; sectors used by directory
+          xchg    ax, cx
+          
+     ; compute location of root directory and store in "ax"
+     
+          mov     al, BYTE [bpbNumberOfFATs]            ; number of FATs
+          mul     WORD [bpbSectorsPerFAT]               ; sectors used by FATs
+          add     ax, WORD [bpbReservedSectors]         ; adjust for bootsector
+          mov     WORD [datasector], ax                 ; base of root directory
+          add     WORD [datasector], cx
+          
+     ; read root directory into memory (7C00:0200)
+     
+          mov     bx, 0x0200                            ; copy root dir above bootcode
+          call    ReadSectors
 
-        ; read root directory into memory (7C00:0200)
-        mov     bx, 0x0200                    ; copy root dir above bootcode
-        call    ReadSectors
+     ;----------------------------------------------------
+     ; Find stage 2
+     ;----------------------------------------------------
 
-        ;----------------------------------------------------
-        ; Find stage 2
-        ;----------------------------------------------------
+     ; browse root directory for binary image
+          mov     cx, WORD [bpbRootEntries]             ; load loop counter
+          mov     di, 0x0200                            ; locate first root entry
+     .LOOP:
+          push    cx
+          mov     cx, 0x000B                            ; eleven character name
+          mov     si, ImageName                         ; image name to find
+          push    di
+     rep  cmpsb                                         ; test for entry match
+          pop     di
+          je      LOAD_FAT
+          pop     cx
+          add     di, 0x0020                            ; queue next directory entry
+          loop    .LOOP
+          jmp     FAILURE
 
-        ; browse root directory for binary image
-        mov     cx, WORD [bpbRootEntries]     ; load loop counter
-        mov     di, 0x0200                    ; locate first root entry
-    .LOOP:
-        push    cx
-        mov     cx, 0x000B                    ; eleven character name
-        mov     si, ImageName                 ; image name to find
-        push    di
-    rep cmpsb                               ; test for entry match
-        pop     di
-        je      LOAD_FAT
-        pop     cx
-        add     di, 0x0020                    ; queue next directory entry
-        loop    .LOOP
-        jmp     FAILURE
+     ;----------------------------------------------------
+     ; Load FAT
+     ;----------------------------------------------------
 
-        ;----------------------------------------------------
-        ; Load FAT
-        ;----------------------------------------------------
+     LOAD_FAT:
+     
+     ; save starting cluster of boot image
+     
+          mov     si, msgCRLF
+          call    Print
+          mov     dx, WORD [di + 0x001A]
+          mov     WORD [cluster], dx                  ; file's first cluster
+          
+     ; compute size of FAT and store in "cx"
+     
+          xor     ax, ax
+          mov     al, BYTE [bpbNumberOfFATs]          ; number of FATs
+          mul     WORD [bpbSectorsPerFAT]             ; sectors used by FATs
+          mov     cx, ax
 
-    LOAD_FAT:
+     ; compute location of FAT and store in "ax"
 
-        ; save starting cluster of boot image
-        mov     si, msgCRLF
-        call    Print
-        mov     dx, WORD [di + 0x001A]
-        mov     WORD [cluster], dx            ; file's first cluster
+          mov     ax, WORD [bpbReservedSectors]       ; adjust for bootsector
+          
+     ; read FAT into memory (7C00:0200)
 
-        ; compute size of FAT and store in "cx"
-        xor     ax, ax
-        mov     al, BYTE [bpbNumberOfFATs]    ; number of FATs
-        mul     WORD [bpbSectorsPerFAT]       ; sectors used by FATs
-        mov     cx, ax
+          mov     bx, 0x0200                          ; copy FAT above bootcode
+          call    ReadSectors
 
-        ; compute location of FAT and store in "ax"
-        mov     ax, WORD [bpbReservedSectors] ; adjust for bootsector
+     ; read image file into memory (0050:0000)
+     
+          mov     si, msgCRLF
+          call    Print
+          mov     ax, 0x0050
+          mov     es, ax                              ; destination for image
+          mov     bx, 0x0000                          ; destination for image
+          push    bx
 
-        ; read FAT into memory (7C00:0200)
-        mov     bx, 0x0200                    ; copy FAT above bootcode
-        call    ReadSectors
+     ;----------------------------------------------------
+     ; Load Stage 2
+     ;----------------------------------------------------
 
-        ; read image file into memory (0050:0000)
-        mov     si, msgCRLF
-        call    Print
-        mov     ax, 0x0050
-        mov     es, ax                        ; destination for image
-        mov     bx, 0x0000                    ; destination for image
-        push    bx
-
-        ;----------------------------------------------------
-        ; Load Stage 2
-        ;----------------------------------------------------
-
-    LOAD_IMAGE:
-
-        mov     ax, WORD [cluster]            ; cluster to read
-        pop     bx                            ; buffer to read into
-        call    ClusterLBA                    ; convert cluster to LBA
-        xor     cx, cx
-        mov     cl, BYTE [bpbSectorsPerCluster] ; sectors to read
-        call    ReadSectors
-        push    bx
-
-        ; compute next cluster
-
-        mov     ax, WORD [cluster]            ; identify current cluster
-        mov     cx, ax                        ; copy current cluster
-        mov     dx, ax                        ; copy current cluster
-        shr     dx, 0x0001                    ; divide by two
-        add     cx, dx                        ; sum for (3/2)
-        mov     bx, 0x0200                    ; location of FAT in memory
-        add     bx, cx                        ; index into FAT
-        mov     dx, WORD [bx]                 ; read two bytes from FAT
-        test    ax, 0x0001
-        jnz     .ODD_CLUSTER
-
-    .EVEN_CLUSTER:
-
-        and     dx, 0000111111111111b         ; take low twelve bits
-        jmp     .DONE
-
-    .ODD_CLUSTER:
-
-        shr     dx, 0x0004                    ; take high twelve bits
-
-    .DONE:
-
-        mov     WORD [cluster], dx            ; store new cluster
-        cmp     dx, 0x0FF0                    ; test for end of file
-        jb      LOAD_IMAGE
-
-    DONE:
-
-        mov     si, msgCRLF
-        call    Print
-        push    WORD 0x0050
-        push    WORD 0x0000
-        retf
-
-    FAILURE:
-
-        mov     si, msgFailure
-        call    Print
-        mov     ah, 0x00
-        int     0x16                          ; await keypress
-        int     0x19                          ; warm boot computer
+     LOAD_IMAGE:
+     
+          mov     ax, WORD [cluster]                  ; cluster to read
+          pop     bx                                  ; buffer to read into
+          call    ClusterLBA                          ; convert cluster to LBA
+          xor     cx, cx
+          mov     cl, BYTE [bpbSectorsPerCluster]     ; sectors to read
+          call    ReadSectors
+          push    bx
+          
+     ; compute next cluster
+     
+          mov     ax, WORD [cluster]                  ; identify current cluster
+          mov     cx, ax                              ; copy current cluster
+          mov     dx, ax                              ; copy current cluster
+          shr     dx, 0x0001                          ; divide by two
+          add     cx, dx                              ; sum for (3/2)
+          mov     bx, 0x0200                          ; location of FAT in memory
+          add     bx, cx                              ; index into FAT
+          mov     dx, WORD [bx]                       ; read two bytes from FAT
+          test    ax, 0x0001
+          jnz     .ODD_CLUSTER
+          
+     .EVEN_CLUSTER:
+     
+          and     dx, 0000111111111111b               ; take low twelve bits
+         jmp     .DONE
+         
+     .ODD_CLUSTER:
+     
+          shr     dx, 0x0004                          ; take high twelve bits
+          
+     .DONE:
+     
+          mov     WORD [cluster], dx                  ; store new cluster
+          cmp     dx, 0x0FF0                          ; test for end of file
+          jb      LOAD_IMAGE
+          
+     DONE:
+     
+          mov     si, msgCRLF
+          call    Print
+          push    WORD 0x0050
+          push    WORD 0x0000
+          retf
+          
+     FAILURE:
+     
+          mov     si, msgFailure
+          call    Print
+          mov     ah, 0x00
+          int     0x16                                ; await keypress
+          int     0x19                                ; warm boot computer
 
     absoluteSector db 0x00
     absoluteHead   db 0x00
