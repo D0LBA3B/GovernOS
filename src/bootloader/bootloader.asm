@@ -10,7 +10,6 @@ start:
 ;*************************************************;
 
 ; This section contains the BIOS Parameter Block (BPB), which provides information about the disk layout.
-
 bpbOEM          db "GovernOs "   ; The OEM name for the operating system, 8 bytes, required by FAT12/FAT16.
 
 bpbBytesPerSector:   DW 512      ; Number of bytes per sector (512 bytes in this case).
@@ -181,7 +180,7 @@ main:
         mov     cx, 0x000B                    ; eleven character name
         mov     si, ImageName                 ; image name to find
         push    di
-    rep     cmpsb                         ; test for entry match
+    rep cmpsb                               ; test for entry match
         pop     di
         je      LOAD_FAT
         pop     cx
