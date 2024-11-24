@@ -144,6 +144,7 @@ main:
           mov     ss, ax
           mov     sp, 0xFFFF
           sti						; restore interrupts
+          mov  [bootdevice], dl
 
      ;----------------------------------------------------
      ; Display loading message
@@ -284,6 +285,7 @@ main:
      
           mov     si, msgCRLF
           call    Print
+	     mov	   dl, [bootdevice]
           push    WORD 0x0050
           push    WORD 0x0000
           retf
